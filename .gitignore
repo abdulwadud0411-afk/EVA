@@ -1,0 +1,26 @@
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+Lib/
+include/
+Scripts/
+
+# Python Cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment variables (API Keys)
+.env
+
+# Audio/Test files
+*.mp3
+*.wav
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
