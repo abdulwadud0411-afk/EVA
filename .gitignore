@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -37,3 +38,31 @@ certs/
 Thumbs.db
 .DS_Store
 desktop.ini
+=======
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+Lib/
+include/
+Scripts/
+
+# Python Cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment variables (API Keys)
+.env
+
+# Audio/Test files
+*.mp3
+*.wav
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+>>>>>>> e22ae5255e956edd32b9f07600ef5b15c3bc7918
