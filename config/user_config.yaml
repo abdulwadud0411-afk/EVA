@@ -1,0 +1,5 @@
+# EVA user overrides. Safe to commit; contains no secrets.
+# This file is written automatically when settings are changed via
+# ConfigManager.set(..., persist=True). It may be empty initially.
+
+{}

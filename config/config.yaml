@@ -1,0 +1,432 @@
+# EVA default configuration.
+# Safe to commit. Secrets belong in .env, never here.
+
+app:
+  name: "EVA"
+  version: "0.1.0"
+  debug: false
+  data_dir: "./data"
+
+# ===================================================================== #
+# AI
+# ===================================================================== #
+ai:
+  provider: "deepseek"
+  history_limit: 8
+
+  deepseek:
+    base_url: "https://api.deepseek.com"
+    primary_model: "deepseek-v4-flash"
+    reasoning_model: "deepseek-v4-pro"
+    vision_model: "deepseek-v4-flash-vision-exp"
+    temperature: 0.2
+    max_tokens: 8192
+    timeout_seconds: 120
+
+  ollama:
+    base_url: "http://localhost:11434"
+    primary_model: "qwen2.5:3b"
+    temperature: 0.3
+    max_tokens: 4096
+    timeout_seconds: 300
+
+  openai:
+    base_url: "https://api.openai.com/v1"
+    primary_model: "gpt-4o-mini"
+    temperature: 0.2
+    max_tokens: 4096
+    timeout_seconds: 120
+
+  anthropic:
+    base_url: "https://api.anthropic.com/v1"
+    primary_model: "claude-3-5-sonnet-latest"
+    temperature: 0.2
+    max_tokens: 4096
+    timeout_seconds: 120
+
+  gemini:
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    primary_model: "gemini-1.5-flash"
+    temperature: 0.2
+    max_tokens: 4096
+    timeout_seconds: 120
+
+# ===================================================================== #
+# Vision
+# ===================================================================== #
+vision:
+  enabled: true
+  provider: "deepseek"
+  min_confidence: 0.70
+  max_image_bytes: 5000000
+  default_prompt: "Describe what is visible in this screenshot, focusing on UI elements, text, and any actionable items."
+
+# ===================================================================== #
+# Voice
+# ===================================================================== #
+voice:
+  enabled: true
+  speak_responses: true
+  speak_only_in_voice_mode: true
+
+  wake_word:
+    enabled: true
+    mode: "hybrid"
+    phrases:
+      - "hey eva"
+      - "hello eva"
+      - "wake up eva"
+      - "hey eva are you there"
+    openwakeword:
+      enabled: true
+      model: "hey_jarvis"
+      sensitivity: 0.5
+      chunk_seconds: 1.5
+    verify_with_stt: true
+    min_confidence: 0.5
+    cooldown_seconds: 2.0
+    listen_timeout: 30
+
+  interruption:
+    enabled: true
+    phrases:
+      - "stop"
+      - "eva stop"
+      - "be quiet"
+      - "shut up"
+    check_interval_seconds: 1.0
+
+  panic:
+    enabled: true
+    hotkey: "ctrl+shift+q"
+
+  stt:
+    provider: "faster-whisper"
+    language: "en"
+    sample_rate: 16000
+    channels: 1
+    device_index: "auto"
+    silence_threshold: 0.005
+    silence_duration: 2.5
+    max_record_seconds: 30
+    faster_whisper:
+      model: "small"
+      device: "cpu"
+      compute_type: "int8"
+      beam_size: 5
+      vad_filter: true
+      initial_prompt: "Hey EVA, open Chrome, Notepad, volume up, open YouTube, take screenshot. Hi EVA."
+
+  tts:
+    provider: "edge"
+    language: "auto"
+    edge:
+      en_voice: "en-US-AvaNeural"
+      bn_voice: "bn-BD-NabanitaNeural"
+      rate: "+0%"
+      volume: "+0%"
+      pitch: "+0Hz"
+    piper:
+      voice_model: "en_US-lessac-medium.onnx"
+      models_dir: "./models/piper"
+      speed: 1.0
+      pitch: 0.0
+
+# ===================================================================== #
+# Agent
+# ===================================================================== #
+agent:
+  max_steps: 6
+  max_retries: 2
+  require_verification: true
+  local_intent_enabled: true
+  dynamic_tools_enabled: true
+  detect_duplicate_tool_calls: true
+
+# ===================================================================== #
+# Security
+# ===================================================================== #
+security:
+  terminal_confirmation: true
+  delete_confirmation: true
+  system_changes_confirmation: true
+
+# ===================================================================== #
+# Memory
+# ===================================================================== #
+memory:
+  enabled: true
+  database_path: "./data/eva.db"
+  max_history_messages: 50
+  auto_vacuum: true
+  retention_days: 365
+  knowledge_limit: 5000
+  skills_limit: 500
+
+# ===================================================================== #
+# Knowledge / RAG
+# ===================================================================== #
+knowledge:
+  enabled: true
+  ingest_dir: "./data/knowledge/ingest"
+  chunk_size: 500
+  chunk_overlap: 50
+  max_chunks_per_doc: 2000
+  embedding:
+    backend: "fastembed"
+    model: "BAAI/bge-small-en-v1.5"
+    dimension: 384
+    cache_dir: "./models/embeddings"
+  vector_store:
+    backend: "faiss"
+    path: "./data/knowledge/vectors"
+    index_name: "eva_knowledge"
+  retrieval:
+    top_k: 5
+    min_score: 0.30
+
+# ===================================================================== #
+# Learning
+# ===================================================================== #
+learning:
+  enabled: true
+
+  video:
+    max_duration_minutes: 90
+    frames_per_minute: 2
+    max_frames: 40
+    download_dir: "./data/knowledge/videos"
+    frames_dir: "./data/knowledge/frames"
+    transcript_dir: "./data/knowledge/transcripts"
+    keep_raw_video: false
+    keep_frames: false
+
+  youtube:
+    enabled: true
+    prefer_transcript_only: true
+    max_quality: "720p"
+
+  workflow:
+    min_steps: 2
+    max_steps: 20
+    save_as_skill: true
+
+  # ------------------------------------------------------------------ #
+  # Demonstration learning (Phase 15)
+  # ------------------------------------------------------------------ #
+  demonstration:
+    enabled: true
+    max_session_minutes: 15
+    screenshot_on_event: true
+    event_debounce_seconds: 0.5
+    max_events: 500
+    max_screenshots: 60
+    save_dir: "./data/knowledge/demos"
+    screenshot_dir: "./data/knowledge/demo_screenshots"
+
+# ===================================================================== #
+# Skills (Phase 15)
+# ===================================================================== #
+skills:
+  enabled: true
+  max_steps_per_skill: 30
+  step_timeout_seconds: 60
+  skill_timeout_seconds: 900
+  auto_verify: true
+  max_retries_per_step: 1
+  allow_high_risk_without_prompt: false
+
+# ===================================================================== #
+# Network (multi-device)
+# ===================================================================== #
+network:
+  enabled: false
+  server:
+    host: "0.0.0.0"
+    port: 8765
+    tls_enabled: true
+    cert_file: "./certs/server.crt"
+    key_file: "./certs/server.key"
+  client:
+    server_url: ""
+    device_id: ""
+  remote_access:
+    enabled: false
+    method: "tunnel"
+    tunnel:
+      provider: "tailscale"
+    relay:
+      url: ""
+      encrypted: true
+
+# ===================================================================== #
+# Storage lifecycle
+# ===================================================================== #
+storage:
+  ssd_root: "./data"
+  hdd_root: ""
+  archive_after_days: 30
+  archive_format: "zip"
+
+  retention:
+    raw_video_days: 0
+    raw_audio_days: 3
+    screenshots_days: 2
+    extracted_frames_days: 14
+    cache_days: 1
+    temp_files_hours: 6
+    conversation_history_days: 180
+    task_history_days: 365
+    protect_knowledge: true
+    protect_skills: true
+    protect_user_memory: true
+
+  quotas:
+    total_data_mb: 0
+    screenshots_mb: 2048
+    media_mb: 10240
+    cache_mb: 512
+    warn_at_percent: 80
+    block_at_percent: 95
+
+  dedup:
+    enabled: true
+    hash_algorithm: "sha256"
+
+  maintenance:
+    run_on_startup: true
+    run_daily_at: "03:30"
+    vacuum_sqlite: true
+    rotate_logs_days: 30
+
+# ===================================================================== #
+# GUI
+# ===================================================================== #
+gui:
+  enabled: false
+  start_minimized: true
+
+# ===================================================================== #
+# Integrations
+# ===================================================================== #
+integrations:
+  blender:
+    enabled: true
+    executable_path: "auto"
+    default_script_timeout: 300
+  unreal:
+    enabled: true
+    remote_control_url: "http://127.0.0.1:30010"
+    editor_cmd_path: "auto"
+  cinema4d:
+    enabled: true
+    executable_path: "auto"
+    default_script_timeout: 300
+  comfyui:
+    enabled: true
+    base_url: "http://127.0.0.1:8188"
+    workflows_dir: "./data/comfyui/workflows"
+    default_workflow: ""
+    timeout_seconds: 600
+
+  adobe:
+    photoshop_path: "auto"
+    illustrator_path: "auto"
+    premiere_path: "auto"
+    after_effects_path: "auto"
+
+  design_cad:
+    autocad:
+      enabled: true
+      executable_path: "auto"
+    fusion360:
+      enabled: true
+      executable_path: "auto"
+    sketchup:
+      enabled: true
+      executable_path: "auto"
+
+  figma:
+    enabled: true
+    access_token_env: "FIGMA_ACCESS_TOKEN"
+
+  capcut:
+    enabled: true
+    executable_path: "auto"
+
+  media_extended:
+    davinci_resolve:
+      enabled: true
+    obs_studio:
+      enabled: false
+      obs_websocket_url: "ws://127.0.0.1:4455"
+      obs_password_env: "OBS_WEBSOCKET_PASSWORD"
+
+  office:
+    word_enabled: true
+    excel_enabled: true
+    powerpoint_enabled: true
+    outlook_enabled: true
+    onenote_enabled: true
+
+  dev_tools:
+    vscode:
+      enabled: true
+    visual_studio:
+      enabled: true
+      executable_path: "auto"
+    android_studio:
+      enabled: true
+      executable_path: "auto"
+    xcode:
+      enabled: false
+    unity:
+      enabled: true
+      executable_path: "auto"
+    webstorm:
+      enabled: true
+      executable_path: "auto"
+    flutter:
+      enabled: true
+    react_native:
+      enabled: true
+    xampp:
+      enabled: true
+      executable_path: "auto"
+    wamp:
+      enabled: true
+      executable_path: "auto"
+    python:
+      enabled: true
+
+  utilities:
+    git:
+      enabled: true
+    docker:
+      enabled: true
+    archive:
+      enabled: true
+    ffmpeg_path: "auto"
+
+  social_media:
+    spotify:
+      enabled: true
+    youtube_music:
+      enabled: true
+    telegram:
+      enabled: true
+    discord:
+      enabled: true
+    zoom:
+      enabled: true
+    whatsapp:
+      enabled: true
+    facebook:
+      enabled: true
+    instagram:
+      enabled: true
+
+  common:
+    ffmpeg_path: "auto"
+    export_output_dir: "./data/exports"
+    project_templates_dir: "./data/project_templates"
