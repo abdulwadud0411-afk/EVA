@@ -2,6 +2,7 @@ httpx>=0.27,<0.29
 pydantic>=2.6,<3
 PyYAML>=6.0,<7
 python-dotenv>=1.0,<2
+cryptography>=42.0
 
 pywin32>=306
 psutil>=5.9
@@ -35,5 +36,12 @@ youtube-transcript-api>=0.6,<2
 keyboard>=0.13.5
 mouse>=0.7.1
 
+# GUI (Phase 21)
+PySide6>=6.6,<7
+
+# Packaging (Phase 22 Batch 4)
+pyinstaller>=6.0,<7
+
+# Testing
 pytest>=8.0,<9
 pytest-asyncio>=0.23,<0.24

@@ -1,0 +1,240 @@
+/* ===================================================================
+ * EVA — Dark Theme (Phase 21)
+ * =================================================================== */
+
+QWidget {
+    background-color: #0f0b1e;
+    color: #f0ecff;
+    font-family: "Segoe UI", "Cascadia Code", sans-serif;
+    font-size: 12px;
+}
+
+/* ---- Main window ---- */
+QMainWindow {
+    background-color: #0f0b1e;
+}
+
+QMainWindow::separator {
+    background-color: #3b2f5c;
+    width: 1px;
+    height: 1px;
+}
+
+/* ---- Panels ---- */
+QFrame#LeftPanel,
+QFrame#RightPanel {
+    background-color: #1a1530;
+    border: 1px solid #3b2f5c;
+    border-radius: 12px;
+}
+
+QFrame#RightPanel QLabel {
+    color: #b8aed4;
+}
+
+/* ---- Header ---- */
+QLabel#EvaTitle {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f0ecff;
+}
+
+QLabel#EvaSubtitle {
+    font-size: 11px;
+    color: #7a6f96;
+}
+
+/* ---- Chat panel ---- */
+QScrollArea#ChatScroll {
+    background-color: transparent;
+    border: none;
+}
+
+QWidget#ChatContainer {
+    background-color: transparent;
+}
+
+/* ---- Message bubbles ---- */
+QFrame#BubbleUser {
+    background-color: #7c3aed;
+    border-radius: 14px;
+    padding: 8px 12px;
+}
+
+QFrame#BubbleAssistant {
+    background-color: #241b3d;
+    border: 1px solid #3b2f5c;
+    border-radius: 14px;
+    padding: 8px 12px;
+}
+
+QLabel#BubbleTextUser {
+    color: #ffffff;
+}
+
+QLabel#BubbleTextAssistant {
+    color: #f0ecff;
+}
+
+QLabel#BubbleTimestamp {
+    color: #7a6f96;
+    font-size: 10px;
+}
+
+/* ---- Input box ---- */
+QLineEdit#ChatInput {
+    background-color: #1e1735;
+    color: #f0ecff;
+    border: 1px solid #3b2f5c;
+    border-radius: 18px;
+    padding: 10px 16px;
+    selection-background-color: #8b5cf6;
+}
+
+QLineEdit#ChatInput:focus {
+    border: 1px solid #8b5cf6;
+}
+
+/* ---- Buttons ---- */
+QPushButton {
+    background-color: #241b3d;
+    color: #f0ecff;
+    border: 1px solid #3b2f5c;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: #2e2347;
+    border: 1px solid #8b5cf6;
+}
+
+QPushButton:pressed {
+    background-color: #7c3aed;
+}
+
+QPushButton:disabled {
+    color: #7a6f96;
+    background-color: #1a1530;
+}
+
+/* ---- Primary button ---- */
+QPushButton#PrimaryButton {
+    background-color: qlineargradient(
+        x1:0, y1:0, x2:1, y2:0,
+        stop:0 #8b5cf6, stop:1 #6366f1
+    );
+    color: #ffffff;
+    border: none;
+}
+
+QPushButton#PrimaryButton:hover {
+    background-color: qlineargradient(
+        x1:0, y1:0, x2:1, y2:0,
+        stop:0 #a78bfa, stop:1 #818cf8
+    );
+}
+
+/* ---- Call button ----
+   Fully self-painted in call_button.py (pure green/red circle +
+   white phone icon). No QSS styling here to avoid conflicts. */
+QPushButton#CallButton {
+    background: transparent;
+    border: none;
+}
+
+/* ---- Status panel ---- */
+QLabel#StatusHeader {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f0ecff;
+}
+
+QLabel#StatusValue {
+    color: #b8aed4;
+    font-size: 12px;
+}
+
+QLabel#StatusDot {
+    font-size: 16px;
+}
+
+/* ---- Scrollbar ---- */
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 8px;
+    margin: 4px 2px 4px 2px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #3b2f5c;
+    border-radius: 4px;
+    min-height: 24px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #8b5cf6;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical,
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+    height: 0px;
+}
+
+/* ---- Tabs (in Settings) ---- */
+QTabWidget::pane {
+    border: 1px solid #3b2f5c;
+    border-radius: 8px;
+    background-color: #1a1530;
+}
+
+QTabBar::tab {
+    background-color: #1a1530;
+    color: #b8aed4;
+    padding: 10px 16px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #2e2347;
+    color: #f0ecff;
+    border-bottom: 2px solid #8b5cf6;
+}
+
+/* ---- Dialogs ---- */
+QDialog {
+    background-color: #0f0b1e;
+}
+
+/* ---- Tray menu ---- */
+QMenu {
+    background-color: #1a1530;
+    color: #f0ecff;
+    border: 1px solid #3b2f5c;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 8px 20px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background-color: #7c3aed;
+}
+
+/* ---- Tooltip ---- */
+QToolTip {
+    background-color: #2e2347;
+    color: #f0ecff;
+    border: 1px solid #8b5cf6;
+    padding: 6px;
+    border-radius: 4px;
+}

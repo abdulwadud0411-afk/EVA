@@ -18,6 +18,14 @@ from typing import Any, Callable, Dict, Optional, Tuple
 import yaml
 from dotenv import load_dotenv
 
+from app.core.paths import (
+    get_app_root,
+    get_config_dir,
+    get_data_dir,
+    find_env_file,
+    get_user_env_path,
+)
+
 
 class ConfigurationError(Exception):
     """Raised when configuration is invalid or required values are missing."""
@@ -29,11 +37,11 @@ _Converter = Callable[[str], Any]
 class ConfigManager:
     """Load and access EVA configuration."""
 
-    _project_root: Path = Path(__file__).resolve().parent.parent.parent
+    _project_root: Path = get_app_root()
 
-    _config_file: Path = _project_root / "config" / "config.yaml"
-    _user_config_file: Path = _project_root / "config" / "user_config.yaml"
-    _env_file: Path = _project_root / ".env"
+    _config_file: Path = get_config_dir() / "config.yaml"
+    _user_config_file: Path = get_config_dir() / "user_config.yaml"
+    _env_file: Path = get_app_root() / ".env"   # fallback; overridden in load()
 
     _config: Dict[str, Any] = {}
     _initialized: bool = False
@@ -75,8 +83,11 @@ class ConfigManager:
         if cls._initialized:
             return
 
-        if cls._env_file.exists():
-            load_dotenv(cls._env_file, override=False)
+        # Find .env in the correct location for dev/frozen mode
+        env_path = find_env_file()
+        if env_path is not None:
+            cls._env_file = env_path
+            load_dotenv(env_path, override=False)
 
         if not cls._config_file.exists():
             raise FileNotFoundError(f"Default config not found: {cls._config_file}")
@@ -135,19 +146,71 @@ class ConfigManager:
 
     @classmethod
     def get_data_dir(cls) -> Path:
-        """Return the absolute data directory, ensuring it exists."""
+        """
+        Return the absolute data directory, ensuring it exists.
+
+        Uses paths.get_data_dir() as the base, so packaged .exe writes
+        into %LOCALAPPDATA%/EVA/data automatically.
+        """
         if not cls._initialized:
             cls.load()
-        raw = cls.get("app.data_dir", "./data")
-        path = Path(raw)
-        if not path.is_absolute():
-            path = cls._project_root / path
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
+        raw = cls.get("app.data_dir", "")
+        # If user explicitly configured an absolute path, honor it.
+        if raw:
+            p = Path(raw)
+            if p.is_absolute():
+                p.mkdir(parents=True, exist_ok=True)
+                return p
+        # Default: use install-aware path helper
+        return get_data_dir()
     @classmethod
     def get_project_root(cls) -> Path:
         return cls._project_root
+
+    @classmethod
+    def get_secret(cls, provider: str) -> Optional[str]:
+        """
+        Return an API key for a provider.
+
+        Resolution order (Phase 20):
+            1. Encrypted vault (data/security/vault.json)
+            2. Environment variable (.env)
+            3. Plaintext config (legacy fallback)
+
+        Args:
+            provider: provider key (e.g. "deepseek")
+        """
+        provider = (provider or "").strip().lower()
+        if not provider:
+            return None
+
+        # 1. Vault
+        try:
+            from app.security.api_vault import APIVault
+            key = APIVault.get(provider)
+            if key:
+                return key
+        except Exception as exc:  # noqa: BLE001
+            # Vault unavailable (cryptography missing) — fall through
+            logger_debug = True  # noqa: F841
+
+        # 2. Env var (via ProviderCatalog mapping)
+        try:
+            from app.settings.provider_catalog import ProviderCatalog
+            env_key = ProviderCatalog.env_key_for(provider)
+            if env_key:
+                value = os.getenv(env_key)
+                if value:
+                    return value
+        except Exception:  # noqa: BLE001
+            pass
+
+        # 3. Plaintext config (legacy)
+        return cls.get(f"ai.{provider}.api_key", None)
+    @classmethod
+    def save_to_user_config(cls) -> None:
+        """Public helper to persist current config (without secrets)."""
+        cls._persist_user_config()
 
     # ------------------------------------------------------------------ #
     # Helpers

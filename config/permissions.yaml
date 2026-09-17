@@ -1,0 +1,48 @@
+# =====================================================================
+# EVA — Permission Configuration (Phase 20)
+# =====================================================================
+# Defines what categories of actions EVA is allowed to perform.
+# Changing these values does NOT require any code changes.
+
+permissions:
+  # Master switch — if true, EVERY action requires confirmation
+  require_confirmation_master: false
+
+  # Per-category default scope
+  #   "allow"   = run without confirmation
+  #   "confirm" = always ask user before running
+  #   "deny"    = block entirely
+  scope:
+    file_read: "allow"
+    file_write: "confirm"
+    file_delete: "confirm"
+    app_control: "allow"
+    terminal: "confirm"
+    network: "allow"
+    clipboard: "allow"
+    system_info: "allow"
+    vision: "allow"
+    knowledge: "allow"
+    skills: "confirm"
+    memory: "allow"
+
+  # Per-tool overrides — takes priority over category scope
+  tool_overrides:
+    delete_file:
+      scope: "confirm"
+      reason: "Deleting files is destructive."
+    run_terminal_command:
+      scope: "confirm"
+      reason: "Shell commands can be destructive."
+    write_file:
+      scope: "allow"
+      reason: "Writing files is a normal operation."
+    open_url:
+      scope: "allow"
+
+  # Per-risk-level default behavior
+  risk_defaults:
+    LOW: "allow"
+    MEDIUM: "allow"
+    HIGH: "confirm"
+    CRITICAL: "confirm"

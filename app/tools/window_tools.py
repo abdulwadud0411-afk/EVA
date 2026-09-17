@@ -207,8 +207,9 @@ class FocusWindowTool(Tool):
         "type": "object",
         "properties": {
             "title": {"type": "string", "description": "Window title substring."},
+            "title_contains": {"type": "string", "description": "Alias for `title`."},
         },
-        "required": ["title"],
+        "required": [],
     }
     risk_level = RiskLevel.LOW
     requires_confirmation = False
@@ -219,7 +220,7 @@ class FocusWindowTool(Tool):
             err.tool = self.name
             return err
 
-        title = str(kwargs.get("title", "")).strip()
+        title = str(kwargs.get("title") or kwargs.get("title_contains") or "").strip()
         if not title:
             return ToolResult(
                 success=False,

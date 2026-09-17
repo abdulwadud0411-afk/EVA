@@ -1,5 +1,5 @@
 """
-Application-control tools (Phase 2).
+Application-control tools (Phase 2 + Phase 19 patches).
 
 Tools:
     - open_application
@@ -8,6 +8,12 @@ Tools:
 
 These are LOW-risk tools: they launch / close user applications and
 inspect running processes. They do NOT modify files or system state.
+
+Phase 19 additions:
+    - open_application now auto-discovers well-known apps (Blender,
+      Photoshop, VS Code, ...) via `app.tools.discovery`.
+    - Success is now verified: the tool returns failure if the
+      process does not actually appear in `tasklist`.
 """
 from __future__ import annotations
 
@@ -26,17 +32,24 @@ logger = get_logger(__name__)
 # Known application aliases -> Windows launch commands
 #
 # We deliberately keep this small and safe. Anything not in this map
-# is looked up by trying the raw name via `where` and then `start`.
+# is looked up via `app.tools.discovery` (well-known install paths)
+# or launched by its raw name (Windows `start` will search PATH).
 # ---------------------------------------------------------------------- #
 _APP_ALIASES: Dict[str, str] = {
+    # Browsers
     "chrome": "chrome",
     "google chrome": "chrome",
     "google-chrome": "chrome",
+    "chrome browser": "chrome",
     "firefox": "firefox",
     "mozilla firefox": "firefox",
     "edge": "msedge",
     "microsoft edge": "msedge",
     "msedge": "msedge",
+    "brave": "brave",
+    "brave browser": "brave",
+
+    # Basics
     "notepad": "notepad",
     "wordpad": "write",
     "explorer": "explorer",
@@ -55,9 +68,45 @@ _APP_ALIASES: Dict[str, str] = {
     "task manager": "taskmgr",
     "taskmgr": "taskmgr",
     "control panel": "control",
+
+    # VS Code (multiple spellings)
     "vscode": "code",
+    "vs code": "code",
+    "vs-code": "code",
+    "vsc": "code",
     "visual studio code": "code",
+    "visual-studio-code": "code",
     "code": "code",
+
+    # Creative tools
+    "blender": "blender",
+    "blender 3d": "blender",
+    "unreal": "UnrealEditor",
+    "unreal engine": "UnrealEditor",
+    "photoshop": "photoshop",
+    "adobe photoshop": "photoshop",
+    "illustrator": "illustrator",
+    "adobe illustrator": "illustrator",
+    "premiere": "Adobe Premiere Pro",
+    "adobe premiere": "Adobe Premiere Pro",
+    "after effects": "AfterFX",
+    "obs": "obs64",
+    "obs studio": "obs64",
+
+    # Office
+    "word": "WINWORD",
+    "excel": "EXCEL",
+    "powerpoint": "POWERPNT",
+    "outlook": "OUTLOOK",
+    "onenote": "ONENOTE",
+
+    # Communication
+    "discord": "Discord",
+    "telegram": "Telegram",
+    "whatsapp": "WhatsApp",
+    "zoom": "Zoom",
+    "slack": "slack",
+    "spotify": "Spotify",
 }
 
 
@@ -70,29 +119,88 @@ def _resolve_command(application: str) -> str:
     """
     Map a friendly name to a launch command.
 
-    Unknown names are returned unchanged — Windows `start` will try
-    to find them on the PATH.
+    Resolution order:
+        1. Friendly alias table (chrome, notepad, ...)
+        2. Auto-discovery via `app.tools.discovery` for well-known
+           apps (Blender, Photoshop, VS Code, ...)
+        3. Fallback: raw name (Windows `start` will search PATH).
     """
     normalized = _normalize_name(application)
-    return _APP_ALIASES.get(normalized, normalized)
+
+    # 1. Alias table
+    alias = _APP_ALIASES.get(normalized)
+    if alias is not None and not _is_path_like(alias):
+        # For simple commands (notepad, chrome, ...) try discovery
+        # first to get the real install path if available.
+        try:
+            from app.tools.discovery import APP_HINTS, discover_known_app
+            if normalized in APP_HINTS:
+                found = discover_known_app(normalized)
+                if found:
+                    logger.info(
+                        "open_application_discovered",
+                        application=normalized,
+                        path=found,
+                    )
+                    return found
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("app_discovery_failed", app=normalized, error=str(exc))
+        return alias
+
+    # 2. Auto-discovery for known install candidates
+    try:
+        from app.tools.discovery import APP_HINTS, discover_known_app
+        if normalized in APP_HINTS:
+            found = discover_known_app(normalized)
+            if found:
+                logger.info(
+                    "open_application_discovered",
+                    application=normalized,
+                    path=found,
+                )
+                return found
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("app_discovery_failed", app=normalized, error=str(exc))
+
+    # 3. Raw fallback
+    return normalized
+
+
+def _is_path_like(value: str) -> bool:
+    """Return True if the value looks like an absolute path."""
+    if not value:
+        return False
+    if "\\" in value or "/" in value:
+        return True
+    if len(value) >= 2 and value[1] == ":":
+        return True
+    return False
 
 
 def _is_process_running(name: str) -> bool:
     """
     Best-effort check whether a process matching `name` is running.
 
-    Uses `tasklist` (always present on Windows). Returns False on any error.
+    `name` may be a full path or a bare executable name. Uses
+    `tasklist` (always present on Windows). Returns False on any error.
     """
+    if not name:
+        return False
+    # Extract the executable base name from a full path if needed.
+    base = os.path.basename(name) if ("\\" in name or "/" in name) else name
+    if base.lower().endswith(".exe"):
+        base = base[:-4]
+
     try:
         result = subprocess.run(
-            ["tasklist", "/FI", f"IMAGENAME eq {name}.exe", "/NH"],
+            ["tasklist", "/FI", f"IMAGENAME eq {base}.exe", "/NH"],
             capture_output=True,
             text=True,
             timeout=5,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         output = (result.stdout or "").lower()
-        return name.lower() in output and "no tasks" not in output
+        return base.lower() in output and "no tasks" not in output
     except Exception:  # noqa: BLE001
         return False
 
@@ -104,14 +212,14 @@ class OpenApplicationTool(Tool):
     name = "open_application"
     description = (
         "Open an installed Windows application by name. "
-        "Examples: 'chrome', 'notepad', 'calculator', 'vscode'."
+        "Examples: 'chrome', 'notepad', 'calculator', 'vscode', 'blender'."
     )
     parameters = {
         "type": "object",
         "properties": {
             "application": {
                 "type": "string",
-                "description": "Name of the application to open (e.g. 'chrome', 'notepad').",
+                "description": "Name of the application to open.",
             },
         },
         "required": ["application"],
@@ -133,17 +241,15 @@ class OpenApplicationTool(Tool):
 
         command = _resolve_command(application)
 
-        # Windows: use `start` via cmd so URLs and shell: URIs work too.
+        # Windows: use `start` so URLs and shell: URIs work too.
         try:
             if os.name == "nt":
-                # CREATE_NO_WINDOW prevents a flashing console window.
                 subprocess.Popen(
                     ["cmd", "/c", "start", "", command],
                     shell=False,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
             else:
-                # Non-Windows fallback (dev machines / CI).
                 subprocess.Popen([command], shell=False)
         except FileNotFoundError:
             return ToolResult(
@@ -165,9 +271,28 @@ class OpenApplicationTool(Tool):
                 },
             )
 
-        # Give the OS a moment to start the process, then verify
-        time.sleep(1.0)
+        # Give the OS a moment to start the process, then verify.
+        time.sleep(1.5)
         running = _is_process_running(command)
+
+        if not running:
+            return ToolResult(
+                success=False,
+                tool=self.name,
+                data={
+                    "application": application,
+                    "command": command,
+                    "verified_running": False,
+                },
+                error={
+                    "code": "LAUNCH_NOT_VERIFIED",
+                    "message": (
+                        f"Launch command sent for '{application}' but "
+                        f"the process is not running. Check that it is "
+                        f"installed, or configure an explicit path."
+                    ),
+                },
+            )
 
         return ToolResult(
             success=True,
@@ -175,12 +300,8 @@ class OpenApplicationTool(Tool):
             data={
                 "application": application,
                 "command": command,
-                "verified_running": running,
-                "note": (
-                    "Process confirmed running."
-                    if running
-                    else "Launch command sent; process not yet visible in tasklist."
-                ),
+                "verified_running": True,
+                "note": "Process confirmed running.",
             },
         )
 
@@ -220,7 +341,11 @@ class CloseApplicationTool(Tool):
             )
 
         command = _resolve_command(application)
-        process_name = f"{command}.exe"
+        base = os.path.basename(command) if ("\\" in command or "/" in command) else command
+        if base.lower().endswith(".exe"):
+            process_name = base
+        else:
+            process_name = f"{base}.exe"
 
         try:
             result = subprocess.run(
@@ -312,13 +437,11 @@ class ListRunningApplicationsTool(Tool):
             )
 
         processes: List[str] = []
-        seen: set[str] = set()
+        seen: set = set()
         for line in (result.stdout or "").splitlines():
             line = line.strip()
             if not line:
                 continue
-            # CSV format: "image","pid","session","session#","mem"
-            # Just grab the first quoted field.
             first = line.split(",")[0].strip().strip('"')
             if first and first not in seen:
                 seen.add(first)

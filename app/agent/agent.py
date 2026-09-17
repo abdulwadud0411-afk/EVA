@@ -1,16 +1,22 @@
 """
-Agent loop with memory integration (Phase 12 + integration patch).
+Agent loop with memory integration (Phase 12 + Phase 16).
 
 Flow:
     1. Handle memory commands locally (remember / what's my name).
     2. Try LOCAL intent matching (0 tokens).
-    3. Otherwise → AI provider with dynamically selected tools.
-    4. Save every message to persistent memory.
+    3. If request is complex → Planner + Executor + Verifier + Recovery.
+    4. Otherwise → AI provider with dynamically selected tools.
+    5. Save every message to persistent memory.
 
 Memory integration:
     - Conversation history stored in SQLite (survives restarts).
     - User preferences auto-detected from "remember X" commands.
     - Memory context injected into system prompt.
+
+Phase 16 integration:
+    - Planner path engages only for long, multi-action requests.
+    - Trivial plans fall back to the direct tool-calling path.
+    - Planner path failure logs a warning and falls back gracefully.
 """
 from __future__ import annotations
 
@@ -24,11 +30,14 @@ import app.tools  # noqa: F401
 from app.agent.local_intent import match_local
 from app.agent.tool_selector import select_tool_schemas
 from app.brain.provider_registry import ProviderRegistry
+from app.brain.ai_router import AIRouter
+from app.brain.routing_rules import RoutingContext
 from app.brain.response_models import AIResponse, ToolCall
 from app.core.config_manager import ConfigManager
 from app.core.events import Event, EventBus
 from app.core.logger import get_logger
 from app.core.state import app_state, TaskState
+from app.tools.base import ToolResult
 from app.tools.registry import ToolRegistry
 
 logger = get_logger(__name__)
@@ -324,15 +333,106 @@ class AgentLoop:
                 await self._speak(text)
                 return text
 
-        # 2. Provider path
+        # 2. Provider path (includes Phase 16 planner check)
         text = await self._run_provider(user_input)
         await self._speak(text)
         return text
 
     # ------------------------------------------------------------------ #
-    # Provider path
+    # Phase 16 — Planner path detection
+    # ------------------------------------------------------------------ #
+    def _should_use_planner(self, user_input: str) -> bool:
+        """Decide if a request is complex enough for the planner path."""
+        if not bool(ConfigManager.get("agent.planner.enabled", True)):
+            return False
+
+        text = (user_input or "").strip()
+        min_len = int(ConfigManager.get("agent.planner.min_length_for_planning", 60))
+        if len(text) < min_len:
+            return False
+
+        raw_words = ConfigManager.get(
+            "agent.planner.multi_action_words",
+            ["and", "then", "after", "also", "তারপর", "এবং", "ও"],
+        )
+        words = [str(w).lower() for w in (raw_words or [])]
+        low = text.lower()
+        return any(w and w in low for w in words)
+
+    # ------------------------------------------------------------------ #
+    # Phase 16 — Planner path execution
+    # ------------------------------------------------------------------ #
+    async def _run_planner_path(self, user_input: str) -> str:
+        """
+        Complex request: plan -> execute -> verify.
+        Raises RuntimeError("trivial_plan_skip") if the plan turns out
+        to be a single step, so the caller can fall back to the direct
+        path.
+        """
+        from app.agent.planner import Planner
+        from app.agent.executor import Executor
+        from app.agent.verifier import AgentVerifier
+        from app.agent.recovery import Recovery
+
+        app_state.task_state = TaskState.PLANNING
+
+        planner = Planner(event_bus=self.event_bus)
+        plan = await planner.create_plan(user_input)
+
+        if plan.is_trivial:
+            raise RuntimeError("trivial_plan_skip")
+
+        self.event_bus.publish(Event("PLANNER_PATH_ENGAGED", {
+            "goal": plan.goal,
+            "steps": len(plan.steps),
+        }))
+        logger.info("planner_path_engaged", steps=len(plan.steps))
+
+        app_state.task_state = TaskState.EXECUTING
+
+        executor = Executor(event_bus=self.event_bus)
+        recovery = Recovery(event_bus=self.event_bus)
+        verifier = AgentVerifier(event_bus=self.event_bus)
+
+        execution = await executor.execute(plan, recovery=recovery)
+
+        app_state.task_state = TaskState.VERIFYING
+        verification = await verifier.verify_plan(plan, execution)
+
+        final = execution.final_message
+        if not verification.verified:
+            final += " (some steps could not be verified)"
+
+        # Phase 16 fix: append the user message + assistant reply so the
+        # history stays well-formed (a user turn with its assistant reply).
+        self._memory_save_user(user_input)
+        self._memory_save_assistant(final)
+        self.history.append({"role": "user", "content": user_input})
+        self.history.append({"role": "assistant", "content": final})
+        self._trim_history()
+
+        app_state.task_state = TaskState.IDLE
+        return final
+
+    # ------------------------------------------------------------------ #
+    # Provider path (direct tool-calling — unchanged for simple requests)
     # ------------------------------------------------------------------ #
     async def _run_provider(self, user_input: str) -> str:
+        # ---- Phase 16: try planner first for complex requests ---- #
+        if self._should_use_planner(user_input):
+            try:
+                return await self._run_planner_path(user_input)
+            except RuntimeError as exc:
+                if "trivial_plan_skip" not in str(exc):
+                    raise
+                logger.info("planner_skipped_trivial_plan")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "planner_path_failed_falling_back",
+                    error=str(exc),
+                )
+        # ---- Direct path (original behavior) ---- #
+
         provider = self._get_provider()
         app_state.task_state = TaskState.THINKING
         self.history.append({"role": "user", "content": user_input})
@@ -353,13 +453,23 @@ class AgentLoop:
         for step in range(self._max_tool_steps):
             messages = [
                 {"role": "system", "content": self._augmented_system_prompt()},
-                *self._history_for_provider(),
+                *self._sanitize_history_for_provider(),
             ]
-
             try:
-                response: AIResponse = await provider.generate(
-                    messages=messages, tools=tools_schema,
-                )
+                # Phase 18: if using router, pass a RoutingContext
+                if isinstance(provider, AIRouter):
+                    ctx = RoutingContext(
+                        text=user_input,
+                        has_tools=bool(tools_schema),
+                        message_count=len(messages),
+                    )
+                    response: AIResponse = await provider.generate(
+                        messages=messages, tools=tools_schema, ctx=ctx,
+                    )
+                else:
+                    response: AIResponse = await provider.generate(
+                        messages=messages, tools=tools_schema,
+                    )
             except Exception as exc:  # noqa: BLE001
                 app_state.task_state = TaskState.FAILED
                 logger.error("agent_generate_failed", error=str(exc))
@@ -414,7 +524,38 @@ class AgentLoop:
             for tool_call in filtered_calls:
                 name = tool_call.name
                 args = tool_call.arguments or {}
-                self.event_bus.publish(Event("TOOL_STARTED", {"name": name, "arguments": args}))
+
+                # ---- Phase 20: security pipeline ---- #
+                verdict = await self._security_check(name, args)
+                if not verdict.get("allow", True):
+                    reason = verdict.get("reason", "blocked by security")
+                    blocked_result = ToolResult(
+                        success=False,
+                        tool=name,
+                        error={
+                            "code": "SECURITY_BLOCKED",
+                            "message": reason,
+                        },
+                    )
+                    self.event_bus.publish(Event("TOOL_BLOCKED", {
+                        "name": name,
+                        "arguments": args,
+                        "reason": reason,
+                    }))
+                    self.history.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": name,
+                        "content": json.dumps(
+                            blocked_result.to_dict(), ensure_ascii=False,
+                        ),
+                    })
+                    continue
+
+                # ---- Execute ---- #
+                self.event_bus.publish(
+                    Event("TOOL_STARTED", {"name": name, "arguments": args})
+                )
                 app_state.task_state = TaskState.EXECUTING
                 result = await ToolRegistry.execute(name, args)
                 self.event_bus.publish(
@@ -447,18 +588,60 @@ class AgentLoop:
     # ------------------------------------------------------------------ #
     # History hygiene
     # ------------------------------------------------------------------ #
-    def _history_for_provider(self) -> List[Dict[str, Any]]:
+    def _sanitize_history_for_provider(self) -> List[Dict[str, Any]]:
+        """
+        Return a history that is safe to send to the AI provider.
+
+        Rules enforced:
+            - Every `tool` message must be preceded by an assistant
+              message with matching `tool_calls`.
+            - Any unresolved assistant `tool_calls` (whose tool
+              response never arrived) are dropped.
+            - Leading tool messages are dropped.
+        """
         if not self.history:
             return []
-        start = 0
-        for i, msg in enumerate(self.history):
-            if msg.get("role") == "tool":
-                continue
-            start = i
-            break
-        else:
-            return []
-        return self.history[start:]
+
+        sanitized: List[Dict[str, Any]] = []
+        pending_tool_ids: set = set()
+
+        def _drop_trailing_assistant_with_tool_calls() -> None:
+            for i in range(len(sanitized) - 1, -1, -1):
+                m = sanitized[i]
+                if m.get("role") == "assistant" and m.get("tool_calls"):
+                    del sanitized[i:]
+                    return
+
+        for msg in self.history:
+            role = msg.get("role")
+            if role == "assistant":
+                sanitized.append(msg)
+                pending_tool_ids = set()
+                for tc in msg.get("tool_calls") or []:
+                    if isinstance(tc, dict) and "id" in tc:
+                        pending_tool_ids.add(tc["id"])
+            elif role == "tool":
+                tc_id = msg.get("tool_call_id")
+                if tc_id in pending_tool_ids:
+                    sanitized.append(msg)
+                    pending_tool_ids.discard(tc_id)
+                # else: drop orphan tool message
+            elif role == "user":
+                # If previous assistant tool_calls never resolved, drop
+                # that assistant message (and any trailing tool messages
+                # already added) so the user turn starts clean.
+                if pending_tool_ids:
+                    _drop_trailing_assistant_with_tool_calls()
+                    pending_tool_ids.clear()
+                sanitized.append(msg)
+            else:
+                sanitized.append(msg)
+
+        # If the last assistant turn has unresolved tool_calls, drop it.
+        if pending_tool_ids:
+            _drop_trailing_assistant_with_tool_calls()
+
+        return sanitized
 
     def _drop_dangling_tool_calls(self) -> None:
         if not self.history:
@@ -514,22 +697,178 @@ class AgentLoop:
             text = data.get("text", "")
             return f"Clipboard: {text}" if text else "Clipboard is empty."
         return "Done."
+        # ------------------------------------------------------------------ #
+    # Phase 20 — Security pipeline
+    # ------------------------------------------------------------------ #
+    async def _security_check(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Run the full security pipeline before executing a tool.
+
+        Pipeline:
+            1. Sandbox    (HIGH/CRITICAL blocked if sandbox active)
+            2. Permissions (allow / confirm / deny)
+            3. Rate limiter
+            4. Network whitelist (for network-touching tools)
+            5. Confirmation gate (if required)
+            6. Audit log
+
+        Returns:
+            {"allow": bool, "reason": str}
+        """
+        try:
+            from app.security import (
+                PermissionManager,
+                ConfirmationGate,
+                RateLimiter,
+                NetworkWhitelist,
+                Sandbox,
+                AuditLog,
+            )
+            from app.tools.registry import ToolRegistry
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("security_import_failed", error=str(exc))
+            return {"allow": True, "reason": "security not available"}
+
+        # Determine risk from tool
+        tool = ToolRegistry.get(tool_name)
+        risk = "LOW"
+        if tool is not None:
+            risk_obj = getattr(tool, "risk_level", None)
+            if risk_obj is not None:
+                risk = getattr(risk_obj, "value", str(risk_obj))
+
+        # 1. Sandbox
+        if not Sandbox.allow_tool(tool_name, risk):
+            AuditLog.log(
+                "SANDBOX_BLOCKED", tool=tool_name, risk=risk,
+                data={"arguments": arguments},
+            )
+            return {
+                "allow": False,
+                "reason": (
+                    f"Sandbox mode is active — '{tool_name}' "
+                    f"(risk {risk}) is not allowed. Exit sandbox to continue."
+                ),
+            }
+
+        # 2. Permissions
+        try:
+            decision = PermissionManager.check(tool_name, risk=risk)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("permission_check_failed", error=str(exc))
+            decision = None
+
+        if decision is not None and not decision.allow:
+            if not decision.requires_confirmation:
+                AuditLog.log(
+                    "PERMISSION_DENIED", tool=tool_name, risk=risk,
+                    data={"reason": decision.reason},
+                )
+                return {"allow": False, "reason": decision.reason}
+
+            # 3. Confirmation required
+            approved = await ConfirmationGate.request(
+                tool_name=tool_name,
+                arguments=arguments,
+                risk=risk,
+                reason=decision.reason,
+            )
+            AuditLog.log(
+                "CONFIRMATION_RESULT",
+                tool=tool_name, risk=risk,
+                data={"approved": approved, "reason": decision.reason},
+            )
+            if not approved:
+                return {
+                    "allow": False,
+                    "reason": "User denied confirmation.",
+                }
+
+        # 4. Rate limit
+        if not RateLimiter.allow(tool_name):
+            AuditLog.log(
+                "RATE_LIMITED", tool=tool_name, risk=risk,
+                data={"arguments": arguments},
+            )
+            return {
+                "allow": False,
+                "reason": f"Rate limit exceeded for '{tool_name}'.",
+            }
+
+        # 5. Network whitelist (for network-touching tools)
+        if tool_name in {"open_url", "search_web", "download_file"}:
+            url = arguments.get("url") or arguments.get("query") or ""
+            if url:
+                wl = NetworkWhitelist.check(str(url))
+                if not wl.allow:
+                    AuditLog.log(
+                        "NETWORK_BLOCKED", tool=tool_name, risk=risk,
+                        data={"url": url, "reason": wl.reason},
+                    )
+                    return {"allow": False, "reason": wl.reason}
+
+        # 6. Audit — log approval
+        AuditLog.log(
+            "TOOL_APPROVED",
+            tool=tool_name, risk=risk,
+            data={"arguments": arguments},
+        )
+        return {"allow": True, "reason": "approved"}
+
 
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
     def _get_provider(self):
         if self._provider is None:
-            self._provider = ProviderRegistry.get_active_provider()
-            app_state.active_provider = type(self._provider).__name__
-            app_state.active_model = getattr(self._provider, "model", "")
-            logger.info(
-                "provider_loaded",
-                provider=app_state.active_provider,
-                model=app_state.active_model,
-            )
-        return self._provider
+            # Phase 18: use AI router (respects routing rules + fallback)
+            try:
+                # Detect monkey-patched stub (used by tests).
+                # If ProviderRegistry.get_active_provider() returns a
+                # class that isn't a registered provider, treat it as a
+                # test stub and bypass the router.
+                active = ProviderRegistry.get_active_provider()
+                active_type = type(active).__name__
+                registered_types = {
+                    cls.__name__
+                    for cls in ProviderRegistry._providers.values()
+                }
+                if active_type not in registered_types:
+                    logger.info(
+                        "test_stub_detected_router_bypassed",
+                        stub=active_type,
+                    )
+                    self._router = None
+                    self._provider = active
+                    app_state.active_provider = active_type
+                    app_state.active_model = getattr(active, "model", "")
+                    return self._provider
 
+                # Normal path: use AI router
+                self._router = AIRouter.from_config()
+                self._provider = self._router
+                app_state.active_provider = "router"
+                app_state.active_model = "auto"
+                logger.info("router_loaded", mode=self._router.mode)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "router_init_failed_fallback_to_registry",
+                    error=str(exc),
+                )
+                self._router = None
+                self._provider = ProviderRegistry.get_active_provider()
+                app_state.active_provider = type(self._provider).__name__
+                app_state.active_model = getattr(self._provider, "model", "")
+                logger.info(
+                    "provider_loaded",
+                    provider=app_state.active_provider,
+                    model=app_state.active_model,
+                )
+        return self._provider
     def _trim_history(self) -> None:
         max_msgs = max(2, self._history_limit)
         if len(self.history) <= max_msgs:

@@ -1,5 +1,5 @@
 """
-SQLite database layer for EVA memory (Phase 12).
+SQLite database layer for EVA memory (Phase 12 + Phase 15).
 
 Creates and manages `data/eva.db` with all required tables.
 Thread-safe through a lock and short-lived connections.
@@ -97,6 +97,22 @@ CREATE TABLE IF NOT EXISTS facts (
 );
 CREATE INDEX IF NOT EXISTS idx_facts_category ON facts(category);
 CREATE INDEX IF NOT EXISTS idx_facts_key ON facts(key);
+
+CREATE TABLE IF NOT EXISTS skill_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    skill_name TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    steps_total INTEGER NOT NULL,
+    steps_completed INTEGER NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    error TEXT,
+    results TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_skill_runs_name
+    ON skill_runs(skill_name);
+CREATE INDEX IF NOT EXISTS idx_skill_runs_created
+    ON skill_runs(created_at);
 """
 
 

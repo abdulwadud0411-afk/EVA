@@ -26,6 +26,40 @@ _GROUPS: List[tuple] = [
         ),
         {"open_application", "close_application", "list_running_applications"},
     ),
+    # NEW: Writing/text tools
+    (
+        re.compile(
+            r"\b(write|type|insert|compose|draft|add\s+text|"
+            r"paragraph|sentence|essay|summary|letter|note|content|"
+            r"like\s+write|likhe|lekha|লিখ|টাইপ|বসা|যোগ)\b",
+            re.IGNORECASE,
+        ),
+        {
+            "type_text", "press_key", "hotkey",
+            "set_clipboard_text", "get_clipboard_text",
+            "word_insert_text", "word_open", "word_create",
+            "excel_open", "powerpoint_open", "onenote_create_page",
+        },
+    ),
+    # NEW: Word / Office explicit
+    (
+        re.compile(
+            r"\b(word|ms\s*word|microsoft\s+word|excel|powerpoint|"
+            r"outlook|onenote|office|document|docx|xlsx|pptx)\b",
+            re.IGNORECASE,
+        ),
+        {
+            "open_application", "focus_window",
+            "type_text", "press_key", "hotkey",
+            "set_clipboard_text",
+            "word_open", "word_create", "word_insert_text",
+            "word_export_pdf",
+            "excel_open", "excel_read_range", "excel_write_range",
+            "powerpoint_open", "powerpoint_add_slide",
+            "onenote_list_notebooks", "onenote_create_page",
+            "onenote_append_to_page",
+        },
+    ),
     (
         re.compile(
             r"\b(youtube|google|gmail|facebook|twitter|instagram|reddit|"

@@ -1,0 +1,46 @@
+# =====================================================================
+# EVA — Network Whitelist (Phase 20)
+# =====================================================================
+# Restricts outbound network calls to approved domains only.
+# EVA will refuse to contact any other host.
+
+network:
+  # Master switch — if false, no domain check is applied
+  whitelist_enabled: true
+
+  # Wildcard matching of subdomains (e.g. allow "api.deepseek.com"
+  # permits "stream.api.deepseek.com")
+  allow_subdomains: true
+
+  # If true, reject any host NOT listed below.
+  # If false, unknown hosts are allowed but logged.
+  block_all_others: true
+
+  # Approved domains
+  allowed_domains:
+    # AI providers
+    - "api.deepseek.com"
+    - "api.openai.com"
+    - "api.anthropic.com"
+    - "generativelanguage.googleapis.com"
+    - "openrouter.ai"
+
+    # Local services
+    - "localhost"
+    - "127.0.0.1"
+    - "::1"
+
+    # Cloud TTS / STT (future phases)
+    - "api.elevenlabs.io"
+    - "speech.platform.bing.com"
+
+    # Package / docs
+    - "pypi.org"
+    - "files.pythonhosted.org"
+    - "github.com"
+    - "raw.githubusercontent.com"
+
+  # If you want to explicitly ban some hosts even if listed above,
+  # put them here. These override allowed_domains.
+  denied_domains: []
+    # - "evil.example.com"

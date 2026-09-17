@@ -1,0 +1,45 @@
+{
+  "_comment": "EVA — PyArmor obfuscation config (Phase 22 Batch 4)",
+  "_usage": "scripts\\obfuscate.bat",
+
+  "target_package": "app",
+  "output_dir": "dist_obfuscated",
+  "recursive": true,
+
+  "exclude_paths": [
+    "app/__init__.py",
+    "app/tests",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/*.pyo"
+  ],
+
+  "pyarmor_options": {
+    "obfuscate": true,
+    "restrict": true,
+    "enable_jit": false,
+    "enable_themida": false,
+    "clear_license": false,
+    "expired": "",
+    "bind_device": false,
+    "bind_disk": false,
+    "bind_mac": false,
+    "bind_ipv4": false,
+    "period": 0,
+    "platform": "windows.x86_64",
+    "advanced": 0,
+    "mix_str": false,
+    "assert_call": false,
+    "assert_import": false,
+    "assert_exception": false,
+    "obf_code": 1,
+    "obf_mod": 1
+  },
+
+  "notes": [
+    "PyArmor Free edition supports a single package.",
+    "For multi-package obfuscation or advanced features, upgrade to Pro.",
+    "Obfuscated output works only with the SAME Python version used to build.",
+    "After obfuscation, run PyInstaller on the obfuscated package (not source)."
+  ]
+}

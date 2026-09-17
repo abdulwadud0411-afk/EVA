@@ -1,8 +1,13 @@
 """
 Skill execution logger (Phase 15).
 
-Records every skill execution into `skill_runs` table in eva.db.
+Records every skill execution into the `skill_runs` table in eva.db.
 Enables audit + future learning-from-failures.
+
+Note:
+    The `skill_runs` table is created by `app.memory.database.SCHEMA`
+    on every fresh DB init, so this module does NOT create its own
+    schema. It only reads/writes rows.
 """
 from __future__ import annotations
 
@@ -16,45 +21,8 @@ from app.memory.database import Database
 logger = get_logger(__name__)
 
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS skill_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    skill_name TEXT NOT NULL,
-    success INTEGER NOT NULL,
-    steps_total INTEGER NOT NULL,
-    steps_completed INTEGER NOT NULL,
-    duration_ms INTEGER NOT NULL,
-    error TEXT,
-    results TEXT,
-    created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_skill_runs_name
-    ON skill_runs(skill_name);
-CREATE INDEX IF NOT EXISTS idx_skill_runs_created
-    ON skill_runs(created_at);
-"""
-
-
 class SkillLogger:
     """Persist skill execution records to SQLite."""
-
-    _schema_ready = False
-
-    @classmethod
-    def _ensure_schema(cls) -> None:
-        if cls._schema_ready:
-            return
-        try:
-            Database.init()
-            conn = Database.connect()
-            try:
-                conn.executescript(_SCHEMA)
-                conn.commit()
-            finally:
-                conn.close()
-            cls._schema_ready = True
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("skill_logger_schema_failed", error=str(exc))
 
     # ------------------------------------------------------------------ #
     # Log
@@ -62,7 +30,6 @@ class SkillLogger:
     @classmethod
     def log_result(cls, result: Any) -> Optional[int]:
         """Save a SkillResult (or dict) and return the row id."""
-        cls._ensure_schema()
         try:
             data = result.to_dict() if hasattr(result, "to_dict") else dict(result)
         except Exception:  # noqa: BLE001
@@ -98,7 +65,6 @@ class SkillLogger:
     # ------------------------------------------------------------------ #
     @classmethod
     def recent(cls, limit: int = 20) -> List[Dict[str, Any]]:
-        cls._ensure_schema()
         try:
             rows = Database.fetchall(
                 "SELECT * FROM skill_runs ORDER BY id DESC LIMIT ?",
@@ -111,7 +77,6 @@ class SkillLogger:
 
     @classmethod
     def stats_for(cls, skill_name: str) -> Dict[str, Any]:
-        cls._ensure_schema()
         try:
             row = Database.fetchone(
                 """

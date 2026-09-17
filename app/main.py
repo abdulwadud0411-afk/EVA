@@ -323,13 +323,105 @@ async def main_async(mode: str) -> int:
     return 1
 
 
+def _run_gui() -> int:
+    """Launch the PySide6 dashboard (Phase 21/22)."""
+    try:
+        from PySide6.QtWidgets import QApplication, QDialog
+        from app.gui.main_window import MainWindow
+        from app.gui.tray import TrayController
+        from app.core.paths import get_app_root
+    except Exception as exc:  # noqa: BLE001
+        print(f"[EVA] GUI unavailable: {exc}")
+        print("[EVA] Install PySide6:  pip install PySide6")
+        return 1
+
+    # Phase 22 — startup security checks (non-blocking)
+    try:
+        from app.security import anti_debug_check, anti_tamper_check, anti_tamper_should_block
+        dbg = anti_debug_check()
+        if dbg.get("debugger"):
+            logger.warning("startup_debugger_detected", **dbg)
+        tamper = anti_tamper_check()
+        if not tamper.get("files_intact", True):
+            logger.warning(
+                "startup_files_modified",
+                modified=len(tamper.get("modified_files", [])),
+                missing=len(tamper.get("missing_files", [])),
+            )
+        if anti_tamper_should_block():
+            logger.error("startup_blocked_tamper")
+            print("[EVA] Startup blocked: tamper detected.")
+            return 2
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("startup_security_checks_failed", error=str(exc))
+
+    app = QApplication.instance() or QApplication([])
+
+    # Load dark theme FIRST (applies to wizard too)
+    qss_path = get_app_root() / "app" / "gui" / "styles" / "dark.qss"
+    if qss_path.exists():
+        try:
+            app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("qss_load_failed", error=str(exc))
+
+    # ---- First-run setup wizard (Phase 22) ---- #
+    try:
+        from app.gui.dialogs.setup_wizard import SetupWizard, needs_setup
+        if needs_setup(force_if_no_marker=True):
+            wizard = SetupWizard()
+            result = wizard.exec()
+            if result != QDialog.Accepted:
+                logger.info("setup_wizard_cancelled")
+                return 0
+            # Reload config after wizard saved
+            ConfigManager.reset()
+            ConfigManager.load()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("setup_wizard_failed", error=str(exc))
+
+    # ---- Main window ---- #
+    window = MainWindow()
+    tray = TrayController(window)
+    tray.show()
+
+    window.show()
+
+    try:
+        return app.exec()
+    except KeyboardInterrupt:
+        return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="EVA desktop assistant")
+    parser.add_argument("--gui", action="store_true",
+                        help="Open the full GUI dashboard (Phase 21).")
     parser.add_argument("--voice", action="store_true",
                         help="Push-to-talk voice mode.")
     parser.add_argument("--always-on", action="store_true",
                         help="Wake word + continuous voice + panic button.")
+    parser.add_argument("--settings", action="store_true",
+                        help="Open the AI Provider Settings dialog.")
     args = parser.parse_args()
+
+    # Default: GUI mode (Phase 21). Use --voice / --always-on for CLI.
+    if args.gui or (not args.voice and not args.always_on and not args.settings):
+        try:
+            ConfigManager.load()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[EVA] Config error: {exc}")
+            return 1
+        return _run_gui()
+
+    if args.settings:
+        try:
+            from app.gui.settings_dialog import open_settings
+            open_settings()
+            return 0
+        except Exception as exc:  # noqa: BLE001
+            print(f"[EVA] Could not open settings: {exc}")
+            return 1
 
     if args.always_on:
         mode = "always_on"
@@ -342,7 +434,6 @@ def main() -> int:
         return asyncio.run(main_async(mode))
     except KeyboardInterrupt:
         return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

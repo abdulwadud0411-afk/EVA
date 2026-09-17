@@ -3,7 +3,7 @@
 
 app:
   name: "EVA"
-  version: "0.1.0"
+  version: "0.22.0"
   debug: false
   data_dir: "./data"
 
@@ -12,7 +12,31 @@ app:
 # ===================================================================== #
 ai:
   provider: "deepseek"
-  history_limit: 8
+  history_limit: 4
+
+  # ------------------------------------------------------------------- #
+  # Phase 18 — AI Routing (pick provider/model per request)
+  # ------------------------------------------------------------------- #
+  routing:
+    enabled: true
+    mode: "auto"
+    # If empty, built-in default_rules() are used.
+    # Override here with custom rules:
+    # rules:
+    #   - name: "simple"
+    #     provider: "ollama"
+    #     model: "qwen2.5:3b"
+    #     priority: 20
+    #     max_length: 40
+    #     match_keywords: ["hi", "hello"]
+    #     requires_no_tools: true
+
+  # ------------------------------------------------------------------- #
+  # Phase 18 — Fallback chain (try in order if primary fails)
+  # ------------------------------------------------------------------- #
+  fallback:
+    enabled: true
+    chain: ["deepseek", "ollama"]
 
   deepseek:
     base_url: "https://api.deepseek.com"
@@ -20,9 +44,8 @@ ai:
     reasoning_model: "deepseek-v4-pro"
     vision_model: "deepseek-v4-flash-vision-exp"
     temperature: 0.2
-    max_tokens: 8192
+    max_tokens: 2048
     timeout_seconds: 120
-
   ollama:
     base_url: "http://localhost:11434"
     primary_model: "qwen2.5:3b"
@@ -136,20 +159,146 @@ voice:
 # Agent
 # ===================================================================== #
 agent:
-  max_steps: 6
+  max_steps: 80
   max_retries: 2
   require_verification: true
   local_intent_enabled: true
   dynamic_tools_enabled: true
   detect_duplicate_tool_calls: true
+  max_duplicate_skips: 3
+
+  # ---- Phase 16 additions ----
+  planner:
+    enabled: false
+    min_length_for_planning: 30
+    multi_action_words:
+      - "and"
+      - "then"
+      - "after"
+      - "also"
+      - "তারপর"
+      - "এবং"
+      - "ও"
+    max_steps: 12
+    timeout_seconds: 120
+
+  executor:
+    step_timeout_seconds: 60
+    stop_on_first_failure: false
+
+  recovery:
+    enabled: false
+    max_retries: 1
+    ask_ai_for_alternative: false
+
+  verification:
+    enabled: true
+    use_vision: false
+    screenshot_on_failure: false
 
 # ===================================================================== #
 # Security
 # ===================================================================== #
 security:
+  # ---- Global flags (Phase 19) ----
   terminal_confirmation: true
   delete_confirmation: true
   system_changes_confirmation: true
+
+  # ---- Path Guard (Phase 19) ----
+  paths:
+    allowed_roots:
+      - "~/Desktop"
+      - "~/Documents"
+      - "~/Downloads"
+      - "./data/workspace"
+    blocked_roots:
+      - "C:\\Windows"
+      - "C:\\Program Files"
+      - "C:\\Program Files (x86)"
+      - "C:\\ProgramData"
+
+  # ---- Command Guard (Phase 19) ----
+  terminal:
+    enabled: true
+    confirmation_required: true
+    allowlist:
+      - python
+      - python3
+      - pip
+      - pip3
+      - git
+      - dir
+      - ls
+      - cd
+      - mkdir
+      - md
+      - type
+      - cat
+      - where
+      - which
+      - whoami
+      - echo
+      - pwd
+      - copy
+      - cp
+      - move
+      - mv
+      - node
+      - npm
+      - npx
+      - ffmpeg
+      - ffprobe
+      - blender
+    blocklist:
+      - "\\bformat\\b"
+      - "\\bdiskpart\\b"
+      - "\\bshutdown\\b"
+      - "\\breg\\s+delete\\b"
+      - "\\btakeown\\b"
+      - "\\bicacls\\b"
+      - "\\bcipher\\b"
+      - "\\bdel\\s+/s\\b"
+      - "\\brmdir\\s+/s\\b"
+      - "\\brm\\s+-rf\\b"
+      - "\\bwmic\\b"
+      - "\\bbcdedit\\b"
+      - "\\bpowershell\\s+-enc\\b"
+      - "\\binvoke-expression\\b"
+
+  # ---- Confirmation (Phase 20) ----
+  confirmation:
+    enabled: true
+    high_risk_requires_yes: true
+    critical_requires_typed_yes: true
+    timeout_seconds: 60
+
+  # ---- Audit Log (Phase 20) ----
+  audit:
+    enabled: true
+    log_dir: "./data/security/audit"
+    rotate_days: 30
+
+  # ---- Rate Limiter (Phase 20) ----
+  rate_limit:
+    enabled: true
+    default_per_minute: 30
+    per_tool:
+      run_terminal_command: 10
+      write_file: 60
+      delete_file: 20
+      open_application: 40
+
+  # ---- Sandbox (Phase 20) ----
+  sandbox:
+    enabled: true
+    unknown_task_first_run: true
+    max_sandbox_steps: 5
+    require_approval_after: true
+
+  # ---- Sensitive Data Redaction (Phase 20) ----
+  redactor:
+    enabled: true
 
 # ===================================================================== #
 # Memory
@@ -211,9 +360,6 @@ learning:
     max_steps: 20
     save_as_skill: true
 
-  # ------------------------------------------------------------------ #
-  # Demonstration learning (Phase 15)
-  # ------------------------------------------------------------------ #
   demonstration:
     enabled: true
     max_session_minutes: 15
@@ -300,11 +446,58 @@ storage:
     rotate_logs_days: 30
 
 # ===================================================================== #
-# GUI
+# GUI (Phase 21)
 # ===================================================================== #
 gui:
-  enabled: false
-  start_minimized: true
+  enabled: true
+  start_minimized: false
+  theme: "dark"
+  window:
+    width: 1400
+    height: 860
+    remember_position: true
+  tray:
+    enabled: true
+    show_notifications: true
+  animations:
+    enabled: true
+    waveform: true
+    pulse: true
+    fps: 30
+  chat:
+    max_messages: 500
+    bubble_style: "glass"
+  voice_ui:
+    call_button: true
+    mic_indicator: true
+    auto_scroll: true
+  layout:
+    sphere_width_ratio: 0.58
+    show_system_monitor: true
+    show_info_panel: true
+    show_clock: true
+
+# =====================================================================
+# Licensing (Phase 22)
+# =====================================================================
+licensing:
+  enabled: true
+  public_key_file: "./config/license_public_key.pem"
+  license_file: "./data/security/license.json"
+  on_missing: "allow"      # "allow" = dev mode, "block" = enforce license
+  on_invalid: "warn"       # "warn" = log only, "block" = refuse to start
+  grace_days: 7
+
+# =====================================================================
+# Updater (Phase 22 Batch 3)
+# =====================================================================
+updater:
+  enabled: true
+  manifest_url: ""           # e.g. "https://example.com/eva/manifest.json"
+  channel: "stable"          # stable | beta | dev
+  download_timeout_seconds: 600
+  auto_check_on_startup: false
+  check_interval_hours: 24
 
 # ===================================================================== #
 # Integrations

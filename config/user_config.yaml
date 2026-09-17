@@ -1,5 +1,508 @@
-# EVA user overrides. Safe to commit; contains no secrets.
-# This file is written automatically when settings are changed via
-# ConfigManager.set(..., persist=True). It may be empty initially.
-
-{}
+agent:
+  detect_duplicate_tool_calls: true
+  dynamic_tools_enabled: true
+  executor:
+    ask_ai_for_alternative: false
+    enabled: false
+    max_retries: 1
+    recovery: null
+    step_timeout_seconds: 60
+    stop_on_first_failure: false
+  local_intent_enabled: true
+  max_duplicate_skips: 3
+  max_retries: 2
+  max_steps: 80
+  planner:
+    enabled: false
+    max_steps: 12
+    min_length_for_planning: 30
+    multi_action_words:
+    - and
+    - then
+    - after
+    - also
+    - তারপর
+    - এবং
+    - ও
+    timeout_seconds: 120
+  recovery:
+    ask_ai_for_alternative: false
+    enabled: false
+    max_retries: 1
+  require_verification: true
+  verification:
+    enabled: true
+    screenshot_on_failure: false
+    use_vision: false
+ai:
+  anthropic:
+    base_url: https://api.anthropic.com/v1
+    max_tokens: 4096
+    primary_model: claude-3-5-sonnet-latest
+    temperature: 0.2
+    timeout_seconds: 120
+  deepseek:
+    base_url: https://api.deepseek.com
+    max_tokens: 2048
+    primary_model: deepseek-v4-flash
+    reasoning_model: deepseek-v4-pro
+    temperature: 0.2
+    timeout_seconds: 120
+    vision_model: deepseek-v4-flash-vision-exp
+  fallback:
+    chain:
+    - deepseek
+    - ollama
+    enabled: true
+  gemini:
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    max_tokens: 4096
+    primary_model: gemini-1.5-flash
+    temperature: 0.2
+    timeout_seconds: 120
+  history_limit: 4
+  ollama:
+    base_url: http://localhost:11434
+    max_tokens: 4096
+    primary_model: qwen2.5:3b
+    temperature: 0.3
+    timeout_seconds: 300
+  openai:
+    base_url: https://api.openai.com/v1
+    max_tokens: 4096
+    primary_model: gpt-4o-mini
+    temperature: 0.2
+    timeout_seconds: 120
+  provider: deepseek
+  routing:
+    enabled: true
+    mode: auto
+app:
+  data_dir: ./data
+  debug: false
+  name: EVA
+  version: 0.1.0
+gui:
+  animations:
+    enabled: true
+    fps: 30
+    pulse: true
+    waveform: true
+  chat:
+    bubble_style: glass
+    max_messages: 500
+  enabled: false
+  layout:
+    show_clock: true
+    show_info_panel: true
+    show_system_monitor: true
+    sphere_width_ratio: 0.58
+  start_minimized: true
+  theme: dark
+  tray:
+    enabled: true
+    show_notifications: true
+  voice_ui:
+    auto_scroll: true
+    call_button: true
+    mic_indicator: true
+  window:
+    height: 860
+    remember_position: true
+    width: 1400
+integrations:
+  adobe:
+    after_effects_path: auto
+    illustrator_path: auto
+    photoshop_path: auto
+    premiere_path: auto
+  blender:
+    default_script_timeout: 300
+    enabled: true
+    executable_path: auto
+  capcut:
+    enabled: true
+    executable_path: auto
+  cinema4d:
+    default_script_timeout: 300
+    enabled: true
+    executable_path: auto
+  comfyui:
+    base_url: http://127.0.0.1:8188
+    default_workflow: ''
+    enabled: true
+    timeout_seconds: 600
+    workflows_dir: ./data/comfyui/workflows
+  common:
+    export_output_dir: ./data/exports
+    ffmpeg_path: auto
+    project_templates_dir: ./data/project_templates
+  design_cad:
+    autocad:
+      enabled: true
+      executable_path: auto
+    fusion360:
+      enabled: true
+      executable_path: auto
+    sketchup:
+      enabled: true
+      executable_path: auto
+  dev_tools:
+    android_studio:
+      enabled: true
+      executable_path: auto
+    flutter:
+      enabled: true
+    python:
+      enabled: true
+    react_native:
+      enabled: true
+    unity:
+      enabled: true
+      executable_path: auto
+    visual_studio:
+      enabled: true
+      executable_path: auto
+    vscode:
+      enabled: true
+    wamp:
+      enabled: true
+      executable_path: auto
+    webstorm:
+      enabled: true
+      executable_path: auto
+    xampp:
+      enabled: true
+      executable_path: auto
+    xcode:
+      enabled: false
+  figma:
+    access_token_env: FIGMA_ACCESS_TOKEN
+    enabled: true
+  media_extended:
+    davinci_resolve:
+      enabled: true
+    obs_studio:
+      enabled: false
+      obs_password_env: OBS_WEBSOCKET_PASSWORD
+      obs_websocket_url: ws://127.0.0.1:4455
+  office:
+    excel_enabled: true
+    onenote_enabled: true
+    outlook_enabled: true
+    powerpoint_enabled: true
+    word_enabled: true
+  social_media:
+    discord:
+      enabled: true
+    facebook:
+      enabled: true
+    instagram:
+      enabled: true
+    spotify:
+      enabled: true
+    telegram:
+      enabled: true
+    whatsapp:
+      enabled: true
+    youtube_music:
+      enabled: true
+    zoom:
+      enabled: true
+  unreal:
+    editor_cmd_path: auto
+    enabled: true
+    remote_control_url: http://127.0.0.1:30010
+  utilities:
+    archive:
+      enabled: true
+    docker:
+      enabled: true
+    ffmpeg_path: auto
+    git:
+      enabled: true
+knowledge:
+  chunk_overlap: 50
+  chunk_size: 500
+  embedding:
+    backend: fastembed
+    cache_dir: ./models/embeddings
+    dimension: 384
+    model: BAAI/bge-small-en-v1.5
+  enabled: true
+  ingest_dir: ./data/knowledge/ingest
+  max_chunks_per_doc: 2000
+  retrieval:
+    min_score: 0.3
+    top_k: 5
+  vector_store:
+    backend: faiss
+    index_name: eva_knowledge
+    path: ./data/knowledge/vectors
+learning:
+  demonstration:
+    enabled: true
+    event_debounce_seconds: 0.5
+    max_events: 500
+    max_screenshots: 60
+    max_session_minutes: 15
+    save_dir: ./data/knowledge/demos
+    screenshot_dir: ./data/knowledge/demo_screenshots
+    screenshot_on_event: true
+  enabled: true
+  video:
+    download_dir: ./data/knowledge/videos
+    frames_dir: ./data/knowledge/frames
+    frames_per_minute: 2
+    keep_frames: false
+    keep_raw_video: false
+    max_duration_minutes: 90
+    max_frames: 40
+    transcript_dir: ./data/knowledge/transcripts
+  workflow:
+    max_steps: 20
+    min_steps: 2
+    save_as_skill: true
+  youtube:
+    enabled: true
+    max_quality: 720p
+    prefer_transcript_only: true
+licensing:
+  enabled: true
+  grace_days: 7
+  license_file: ./data/security/license.json
+  on_invalid: warn
+  on_missing: allow
+  public_key_file: ./config/license_public_key.pem
+memory:
+  auto_vacuum: true
+  database_path: ./data/eva.db
+  enabled: true
+  knowledge_limit: 5000
+  max_history_messages: 50
+  retention_days: 365
+  skills_limit: 500
+network:
+  client:
+    device_id: ''
+    server_url: ''
+  enabled: false
+  remote_access:
+    enabled: false
+    method: tunnel
+    relay:
+      encrypted: true
+      url: ''
+    tunnel:
+      provider: tailscale
+  server:
+    cert_file: ./certs/server.crt
+    host: 0.0.0.0
+    key_file: ./certs/server.key
+    port: 8765
+    tls_enabled: true
+security:
+  audit:
+    enabled: false
+    log_dir: ./data/security/audit
+    rotate_days: 30
+  confirmation:
+    critical_requires_typed_yes: true
+    enabled: true
+    high_risk_requires_yes: true
+    timeout_seconds: 60
+  delete_confirmation: false
+  network:
+    whitelist_enabled: false
+  paths:
+    allowed_roots:
+    - ~/Desktop
+    - ~/Documents
+    - ~/Downloads
+    - ./data/workspace
+    blocked_roots:
+    - C:\Windows
+    - C:\Program Files
+    - C:\Program Files (x86)
+    - C:\ProgramData
+  rate_limit:
+    default_per_minute: 30
+    enabled: false
+    per_tool:
+      delete_file: 20
+      open_application: 40
+      run_terminal_command: 10
+      write_file: 60
+  redactor:
+    enabled: true
+  sandbox:
+    enabled: false
+    max_sandbox_steps: 5
+    require_approval_after: true
+    unknown_task_first_run: true
+  system_changes_confirmation: false
+  terminal:
+    allowlist:
+    - python
+    - python3
+    - pip
+    - pip3
+    - git
+    - dir
+    - ls
+    - cd
+    - mkdir
+    - md
+    - type
+    - cat
+    - where
+    - which
+    - whoami
+    - echo
+    - pwd
+    - copy
+    - cp
+    - move
+    - mv
+    - node
+    - npm
+    - npx
+    - ffmpeg
+    - ffprobe
+    - blender
+    blocklist:
+    - \bformat\b
+    - \bdiskpart\b
+    - \bshutdown\b
+    - \breg\s+delete\b
+    - \btakeown\b
+    - \bicacls\b
+    - \bcipher\b
+    - \bdel\s+/s\b
+    - \brmdir\s+/s\b
+    - \brm\s+-rf\b
+    - \bwmic\b
+    - \bbcdedit\b
+    - \bpowershell\s+-enc\b
+    - \binvoke-expression\b
+    confirmation_required: true
+    enabled: true
+  terminal_confirmation: true
+skills:
+  allow_high_risk_without_prompt: false
+  auto_verify: true
+  enabled: true
+  max_retries_per_step: 1
+  max_steps_per_skill: 30
+  skill_timeout_seconds: 900
+  step_timeout_seconds: 60
+storage:
+  archive_after_days: 30
+  archive_format: zip
+  dedup:
+    enabled: true
+    hash_algorithm: sha256
+  hdd_root: ''
+  maintenance:
+    rotate_logs_days: 30
+    run_daily_at: 03:30
+    run_on_startup: true
+    vacuum_sqlite: true
+  quotas:
+    block_at_percent: 95
+    cache_mb: 512
+    media_mb: 10240
+    screenshots_mb: 2048
+    total_data_mb: 0
+    warn_at_percent: 80
+  retention:
+    cache_days: 1
+    conversation_history_days: 180
+    extracted_frames_days: 14
+    protect_knowledge: true
+    protect_skills: true
+    protect_user_memory: true
+    raw_audio_days: 3
+    raw_video_days: 0
+    screenshots_days: 2
+    task_history_days: 365
+    temp_files_hours: 6
+  ssd_root: ./data
+updater:
+  auto_check_on_startup: false
+  channel: stable
+  check_interval_hours: 24
+  download_timeout_seconds: 600
+  enabled: true
+  manifest_url: ''
+vision:
+  default_prompt: Describe what is visible in this screenshot, focusing on UI elements,
+    text, and any actionable items.
+  enabled: true
+  max_image_bytes: 5000000
+  min_confidence: 0.7
+  provider: deepseek
+voice:
+  enabled: true
+  interruption:
+    check_interval_seconds: 1.0
+    enabled: true
+    phrases:
+    - stop
+    - eva stop
+    - be quiet
+    - shut up
+  panic:
+    enabled: true
+    hotkey: ctrl+shift+q
+  speak_only_in_voice_mode: true
+  speak_responses: true
+  stt:
+    channels: 1
+    device_index: auto
+    faster_whisper:
+      beam_size: 5
+      compute_type: int8
+      device: cpu
+      initial_prompt: Hey EVA, open Chrome, Notepad, volume up, open YouTube, take
+        screenshot. Hi EVA.
+      model: small
+      vad_filter: true
+    language: en
+    max_record_seconds: 30
+    provider: faster-whisper
+    sample_rate: 16000
+    silence_duration: 2.5
+    silence_threshold: 0.005
+  tts:
+    edge:
+      bn_voice: bn-BD-NabanitaNeural
+      en_voice: en-US-AvaNeural
+      pitch: +0Hz
+      rate: +0%
+      volume: +0%
+    elevenlabs: {}
+    language: auto
+    piper:
+      models_dir: ./models/piper
+      pitch: 0.0
+      speed: 1.0
+      voice_model: en_US-lessac-medium.onnx
+    provider: edge
+  wake_word:
+    cooldown_seconds: 2.0
+    enabled: true
+    listen_timeout: 30
+    min_confidence: 0.5
+    mode: hybrid
+    openwakeword:
+      chunk_seconds: 1.5
+      enabled: true
+      model: hey_jarvis
+      sensitivity: 0.5
+    phrases:
+    - hey eva
+    - hello eva
+    - wake up eva
+    - hey eva are you there
+    verify_with_stt: true

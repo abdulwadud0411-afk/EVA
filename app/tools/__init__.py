@@ -154,6 +154,39 @@ def register_phase7_tools() -> None:
     ToolRegistry.register_class(DownloadFileTool)
 
 
+def register_phase19_file_tools() -> None:
+    from app.tools.file_tools import (
+        ReadFileTool, WriteFileTool, ListDirectoryTool,
+        CreateFolderTool, MoveFileTool, CopyFileTool,
+        DeleteFileTool, SearchFilesTool,
+    )
+    ToolRegistry.register_class(ReadFileTool)
+    ToolRegistry.register_class(WriteFileTool)
+    ToolRegistry.register_class(ListDirectoryTool)
+    ToolRegistry.register_class(CreateFolderTool)
+    ToolRegistry.register_class(MoveFileTool)
+    ToolRegistry.register_class(CopyFileTool)
+    ToolRegistry.register_class(DeleteFileTool)
+    ToolRegistry.register_class(SearchFilesTool)
+
+
+def register_phase19_system_tools() -> None:
+    from app.tools.system_tools import (
+        GetSystemInfoTool, GetDiskUsageTool, ListTopProcessesTool,
+        GetBatteryStatusTool, GetNetworkInfoTool,
+    )
+    ToolRegistry.register_class(GetSystemInfoTool)
+    ToolRegistry.register_class(GetDiskUsageTool)
+    ToolRegistry.register_class(ListTopProcessesTool)
+    ToolRegistry.register_class(GetBatteryStatusTool)
+    ToolRegistry.register_class(GetNetworkInfoTool)
+
+
+def register_phase19_terminal_tools() -> None:
+    from app.tools.terminal_tools import RunTerminalCommandTool
+    ToolRegistry.register_class(RunTerminalCommandTool)
+
+
 def register_core_tools() -> None:
     register_phase2_tools()
     register_phase3_tools()
@@ -161,6 +194,9 @@ def register_core_tools() -> None:
     register_phase5_tools()
     register_phase6_tools()
     register_phase7_tools()
+    register_phase19_file_tools()
+    register_phase19_system_tools()
+    register_phase19_terminal_tools()
 
 
 # ---------------------------------------------------------------------- #
